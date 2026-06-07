@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Interactive Resume Engine</title>
+  
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+  <style>
+    /* Global scrollbar behavior optimizations */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    /* Ensure colors are rendered exactly during the canvas export process */
+    @media print {
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen font-sans text-slate-800 antialiased flex flex-col lg:flex-row gap-6 p-4 lg:p-8 relative">
+
+  <main class="w-full lg:w-5/12 bg-white rounded-2xl shadow-sm border border-slate-200/80 p-6 max-h-[92vh] overflow-y-auto">
+    <header class="mb-8">
+      <h1 class="text-2xl font-bold text-slate-900 tracking-tight">Resume Designer</h1>
+      <p class="text-sm text-slate-500 mt-1">Modify your details below. The preview updates instantly.</p>
+    </header>
+
+    <section class="space-y-4 mb-8">
+      <h2 class="text-xs font-bold uppercase tracking-wider text-indigo-600">Personal Information</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <input type="text" id="form-name" value="Jane Doe" placeholder="Full Name" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
+        <input type="text" id="form-role" value="Full Stack Engineer" placeholder="Target Role" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
+        <input type="email" id="form-email" value="jane.doe@example.com" placeholder="Email Address" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
+        <input type="text" id="form-phone" value="+91 98765 43210" placeholder="Phone Number" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition">
+      </div>
+    </section>
+
+    <section class="mb-8">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-indigo-600">Work History</h2>
+        <button id="btn-add-exp" class="inline-flex items-center gap-1 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition shadow-sm cursor-pointer">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          Add Position
+        </button>
+      </div>
+      <div id="experience-dom-hook" class="space-y-4"></div>
+    </section>
+
+    <section class="mb-8">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-xs font-bold uppercase tracking-wider text-indigo-600">Education</h2>
+        <button id="btn-add-edu" class="inline-flex items-center gap-1 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg transition shadow-sm cursor-pointer">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+          Add Education
+        </button>
+      </div>
+      <div id="education-dom-hook" class="space-y-4"></div>
+    </section>
+
+    <section class="space-y-3 mb-8">
+      <h2 class="text-xs font-bold uppercase tracking-wider text-indigo-600">Core Expertise</h2>
+      <textarea id="form-skills" rows="2" placeholder="React, Node.js, Python, TypeScript (comma separated)" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition leading-relaxed">React, Node.js, Python, Tailwind CSS, WebSockets</textarea>
+    </section>
+
+    <button id="btn-export-pdf" class="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm rounded-xl shadow-sm hover:shadow transition flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+      <svg id="btn-icon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+      <span id="btn-text">Generate Document Portfolio</span>
+    </button>
+  </main>
+
+  <aside class="w-full lg:w-7/12 flex justify-center items-start overflow-x-auto p-2 lg:p-0">
+    <div id="resume-container-wrapper" class="bg-white border border-slate-200 shadow-xl shadow-slate-200/50">
+      <div id="resume-sheet-target" class="w-[210mm] min-h-[297mm] p-16" style="box-sizing: border-box; background-color: #ffffff;">
+        
+        <header class="border-b-[3px] border-slate-800 pb-5 mb-8">
+          <h2 id="view-name" class="text-4xl font-black text-slate-900 tracking-tight">Jane Doe</h2>
+          <p id="view-role" class="text-sm font-bold text-indigo-600 uppercase tracking-widest mt-1.5">Full Stack Engineer</p>
+          <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs text-slate-500 mt-4 font-medium">
+            <span id="view-email" class="flex items-center gap-1.5">jane.doe@example.com</span>
+            <span id="view-phone" class="flex items-center gap-1.5">+91 98765 43210</span>
+          </div>
+        </header>
+
+        <section class="mb-8">
+          <h3 class="text-sm font-bold uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-1.5 mb-5">Professional History</h3>
+          <div id="view-experience-hook" class="space-y-6"></div>
+        </section>
+
+        <section class="mb-8">
+          <h3 class="text-sm font-bold uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-1.5 mb-5">Education Background</h3>
+          <div id="view-education-hook" class="space-y-6"></div>
+        </section>
+
+        <section>
+          <h3 class="text-sm font-bold uppercase tracking-widest text-slate-400 border-b border-slate-100 pb-1.5 mb-4">Technical Proficiencies</h3>
+          <div id="view-skills-hook" class="flex flex-wrap gap-2"></div>
+        </section>
+
+      </div>
+    </div>
+  </aside>
+
+  <div id="notification-center" class="fixed bottom-5 right-5 z-50 pointer-events-none space-y-3 max-w-sm w-full px-4 sm:px-0"></div>
+
+  <script>
+    const ResumeEngine = {
+      state: {
+        personal: { name: '', role: '', email: '', phone: '' },
+        experiences: [
+          { company: 'Tech Corp', role: 'Software Engineer', duration: '2024 - Present', desc: 'Developed real-time web applications using React and WebSockets.' }
+        ],
+        education: [
+          { institution: 'Aditya Degree College', degree: 'Bachelor of Science in Computer Science', duration: '2022 - 2025', details: 'Graduated with specialized honors in software paradigms.' }
+        ]
+      },
+
+      init() {
+        this.cacheDOM();
+        this.bindEvents();
+        this.syncInputsToState();
+        this.renderFormInputs();
+        this.renderEducationInputs();
+        this.renderLivePreview();
+      },
+
+      cacheDOM() {
+        this.dom = {
+          formName: document.getElementById('form-name'),
+          formRole: document.getElementById('form-role'),
+          formEmail: document.getElementById('form-email'),
+          formPhone: document.getElementById('form-phone'),
+          formSkills: document.getElementById('form-skills'),
+          expFormHook: document.getElementById('experience-dom-hook'),
+          eduFormHook: document.getElementById('education-dom-hook'),
+          btnAddExp: document.getElementById('btn-add-exp'),
+          btnAddEdu: document.getElementById('btn-add-edu'),
+          btnExportPdf: document.getElementById('btn-export-pdf'),
+          btnText: document.getElementById('btn-text'),
+          btnIcon: document.getElementById('btn-icon'),
+          notificationCenter: document.getElementById('notification-center'),
+          
+          viewName: document.getElementById('view-name'),
+          viewRole: document.getElementById('view-role'),
+          viewEmail: document.getElementById('view-email'),
+          viewPhone: document.getElementById('view-phone'),
+          viewExpHook: document.getElementById('view-experience-hook'),
+          viewEduHook: document.getElementById('view-education-hook'),
+          viewSkillsHook: document.getElementById('view-skills-hook'),
+          canvasElement: document.getElementById('resume-sheet-target')
+        };
+      },
+
+      bindEvents() {
+        const structuralInputs = [this.dom.formName, this.dom.formRole, this.dom.formEmail, this.dom.formPhone, this.dom.formSkills];
+        structuralInputs.forEach(element => element.addEventListener('input', () => {
+          this.syncInputsToState();
+          this.renderLivePreview();
+        }));
+
+        this.dom.btnAddExp.addEventListener('click', () => this.addNewExperienceBlock());
+        this.dom.btnAddEdu.addEventListener('click', () => this.addNewEducationBlock());
+        this.dom.btnExportPdf.addEventListener('click', () => this.generatePDF());
+      },
+
+      syncInputsToState() {
+        this.state.personal = {
+          name: this.dom.formName.value,
+          role: this.dom.formRole.value,
+          email: this.dom.formEmail.value,
+          phone: this.dom.formPhone.value
+        };
+      },
+
+      renderFormInputs() {
+        this.dom.expFormHook.innerHTML = '';
+        this.state.experiences.forEach((exp, idx) => {
+          const blockWrapper = document.createElement('div');
+          blockWrapper.className = 'p-4 border border-slate-200 rounded-xl bg-slate-50/50 relative space-y-3';
+          blockWrapper.innerHTML = `
+            <button data-index="${idx}" class="btn-delete-exp absolute top-3 right-3 text-xs font-semibold text-rose-500 hover:text-rose-700 transition cursor-pointer">Delete</button>
+            <div class="grid grid-cols-2 gap-2.5">
+              <input type="text" placeholder="Company" value="${exp.company}" class="input-exp-field px-3 py-1.5 border border-slate-200 rounded-md bg-white text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500" data-key="company" data-index="${idx}">
+              <input type="text" placeholder="Role Title" value="${exp.role}" class="input-exp-field px-3 py-1.5 border border-slate-200 rounded-md bg-white text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500" data-key="role" data-index="${idx}">
+              <input type="text" placeholder="Duration (e.g. 2024 - Present)" value="${exp.duration}" class="input-exp-field px-3 py-1.5 border border-slate-200 rounded-md bg-white text-xs col-span-2 focus:outline-none focus:ring-1 focus:ring-indigo-500" data-key="duration" data-index="${idx}">
+            </div>
+            <textarea placeholder="Contributions and milestones..." class="input-exp-field px-3 py-1.5 border border-slate-200 rounded-md bg-white text-xs w-full h-16 leading-relaxed focus:outline-none focus:ring-1 focus:ring-indigo-500" data-key="desc" data-index="${idx}">${exp.desc}</textarea>
+          `;
+          this.dom.expFormHook.appendChild(blockWrapper);
+        });
+        this.bindDynamicFormEvents();
+      },
+
+      bindDynamicFormEvents() {
+        this.dom.expFormHook.querySelectorAll('.input-exp-field').forEach(input => {
+          input.addEventListener('input', (e) => {
+            const { index, key } = e.target.dataset;
+            this.state.experiences[index][key] = e.target.value;
+            this.renderLivePreview();
+          });
+        });
+
+        this.dom.expFormHook.querySelectorAll('.btn-delete-exp').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const { index } = e.target.dataset;
+            this.state.experiences.splice(index, 1);
+            this.renderFormInputs();
+            this.renderLivePreview();
+          });
+        });
+      },
+
+      addNewExperienceBlock() {
+        this.state.experiences.push({ company: '', role: '', duration: '', desc: '' });
+        this.renderFormInputs();
+        this.renderLivePreview();
+      },
+
+      renderEducationInputs() {
+        this.dom.eduFormHook.innerHTML = '';
+        this.state.education.forEach((edu, idx) => {
+          const blockWrapper = document.createElement('div');
+          blockWrapper.className = 'p-4 border border-slate-200 rounded-xl bg-slate-50/50 relative space-y-3';
+          blockWrapper.innerHTML = `
+            <button data-index="${idx}" class="btn-delete-edu absolute top-3 right-3 text-xs font-semibold text-rose-500 hover:text-rose-700 transition cursor-pointer">Delete</button>
+            <div class="grid grid-cols-2 gap-2.5">
+              <input type="text" placeholder="Institution / College" value="${edu.institution}" class="input-edu-field px-3 py-1.5 border border-slate-200 rounded-md bg-white text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500" data-key="institution" data-index="${idx}">
+              <input type="text" placeholder="Degree / Course" value="${edu.degree}" class="input-edu-field px-3 py-1.5 border border-slate-200 rounded-md bg-white text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500" data-key="degree" data-index="${idx}">
+              <input type="text" placeholder="Duration (e.g. 2022 - 2025)" value="${edu.duration}" class="input-edu-field px-3 py-1.5 border border-slate-200 rounded-md bg-white text-xs col-span-2 focus:outline-none focus:ring-1 focus:ring-indigo-500" data-key="duration" data-index="${idx}">
+            </div>
+            <input type="text" placeholder="Additional details, scores, achievements..." value="${edu.details}" class="input-edu-field px-3 py-1.5 border border-slate-200 rounded-md bg-white text-xs w-full focus:outline-none focus:ring-1 focus:ring-indigo-500" data-key="details" data-index="${idx}">
+          `;
+          this.dom.eduFormHook.appendChild(blockWrapper);
+        });
+        this.bindDynamicEducationEvents();
+      },
+
+      bindDynamicEducationEvents() {
+        this.dom.eduFormHook.querySelectorAll('.input-edu-field').forEach(input => {
+          input.addEventListener('input', (e) => {
+            const { index, key } = e.target.dataset;
+            this.state.education[index][key] = e.target.value;
+            this.renderLivePreview();
+          });
+        });
+
+        this.dom.eduFormHook.querySelectorAll('.btn-delete-edu').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            const { index } = e.target.dataset;
+            this.state.education.splice(index, 1);
+            this.renderEducationInputs();
+            this.renderLivePreview();
+          });
+        });
+      },
+
+      addNewEducationBlock() {
+        this.state.education.push({ institution: '', degree: '', duration: '', details: '' });
+        this.renderEducationInputs();
+        this.renderLivePreview();
+      },
+
+      renderLivePreview() {
+        const { personal } = this.state;
+
+        this.dom.viewName.innerText = personal.name || 'Untitled Identity';
+        this.dom.viewRole.innerText = personal.role || 'Professional Role Spec';
+        this.dom.viewEmail.innerText = personal.email ? `📧 ${personal.email}` : '';
+        this.dom.viewPhone.innerText = personal.phone ? `📞 ${personal.phone}` : '';
+
+        this.dom.viewExpHook.innerHTML = '';
+        this.state.experiences.forEach(exp => {
+          if (!exp.role && !exp.company && !exp.duration && !exp.desc) return;
+          const containerBlock = document.createElement('div');
+          containerBlock.className = 'break-inside-avoid';
+          containerBlock.innerHTML = `
+            <div class="flex justify-between font-bold text-slate-800 text-sm">
+              <span class="font-extrabold">${exp.role || 'Untitled Track'}</span>
+              <span class="text-slate-400 font-medium text-xs">${exp.duration || ''}</span>
+            </div>
+            <div class="text-indigo-600 font-semibold text-xs tracking-wide uppercase mt-0.5">${exp.company || 'Corporate Group'}</div>
+            <p class="text-slate-600 text-xs mt-2 leading-relaxed whitespace-pre-line">${exp.desc || ''}</p>
+          `;
+          this.dom.viewExpHook.appendChild(containerBlock);
+        });
+
+        this.dom.viewEduHook.innerHTML = '';
+        this.state.education.forEach(edu => {
+          if (!edu.degree && !edu.institution && !edu.duration && !edu.details) return;
+          const containerBlock = document.createElement('div');
+          containerBlock.className = 'break-inside-avoid';
+          containerBlock.innerHTML = `
+            <div class="flex justify-between font-bold text-slate-800 text-sm">
+              <span class="font-extrabold">${edu.degree || 'Degree/Certificate'}</span>
+              <span class="text-slate-400 font-medium text-xs">${edu.duration || ''}</span>
+            </div>
+            <div class="text-indigo-600 font-semibold text-xs tracking-wide uppercase mt-0.5">${edu.institution || 'Academic Institute'}</div>
+            <p class="text-slate-600 text-xs mt-1 leading-relaxed whitespace-pre-line">${edu.details || ''}</p>
+          `;
+          this.dom.viewEduHook.appendChild(containerBlock);
+        });
+
+        this.dom.viewSkillsHook.innerHTML = '';
+        const matrixBadges = this.dom.formSkills.value.split(',');
+        matrixBadges.forEach(badgeString => {
+          const validatedString = badgeString.trim();
+          if (validatedString) {
+            const badgeElement = document.createElement('span');
+            badgeElement.className = 'bg-slate-100 text-slate-700 text-[10px] font-bold px-2.5 py-1 rounded border border-slate-200/60 uppercase tracking-wider';
+            badgeElement.innerText = validatedString;
+            this.dom.viewSkillsHook.appendChild(badgeElement);
+          }
+        });
+      },
+
+      // Progress Tracker HUD Alert Layer Popup System Control
+      updateProcessPopup(statusTitle, detailedText, stagePercent = 10, isSuccess = false) {
+        let panel = document.getElementById('dynamic-process-panel');
+        
+        if (!panel) {
+          panel = document.createElement('div');
+          panel.id = 'dynamic-process-panel';
+          panel.className = 'pointer-events-auto bg-slate-900 text-white rounded-xl shadow-2xl border border-slate-800 p-4 transform transition-all duration-300 ease-out translate-y-4 opacity-0 flex flex-col gap-3 w-80';
+          this.dom.notificationCenter.appendChild(panel);
+          
+          setTimeout(() => panel.classList.remove('translate-y-4', 'opacity-0'), 20);
+        }
+
+        const accentColor = isSuccess ? 'text-emerald-400' : 'text-indigo-400';
+        const progressBg = isSuccess ? 'bg-emerald-500' : 'bg-indigo-500';
+        
+        const loaderIcon = isSuccess 
+          ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
+          : `<svg class="animate-spin" xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+
+        panel.innerHTML = `
+          <div class="flex flex-col gap-0.5">
+            <div class="text-xs font-bold uppercase tracking-wider ${accentColor} flex items-center gap-2">
+              ${loaderIcon}
+              ${statusTitle}
+            </div>
+            <div class="text-[11px] text-slate-400 font-medium leading-relaxed">${detailedText}</div>
+          </div>
+          <div class="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+            <div class="${progressBg} h-1.5 transition-all duration-500 ease-out rounded-full" style="width: ${stagePercent}%"></div>
+          </div>
+        `;
+
+        if (isSuccess) {
+          setTimeout(() => {
+            panel.classList.add('opacity-0', 'translate-y-2');
+            setTimeout(() => panel.remove(), 400);
+          }, 4000);
+        }
+      },
+
+      // Safeguarded Fail-safe PDF Generation Pipeline Engine 
+      generatePDF() {
+        // Safe check: Validate if html2pdf loaded correctly across the network CDN frame layers
+        if (typeof html2pdf === 'undefined') {
+          alert("The PDF processing engine is still initializing from the CDN bundle. Please wait a few seconds and try clicking generate again.");
+          return;
+        }
+
+        const targetDOMNode = this.dom.canvasElement;
+        const targetPersonName = this.state.personal.name || 'document';
+        const formattedFilename = `${targetPersonName.toLowerCase().replace(/\s+/g, '_')}_resume.pdf`;
+
+        // Intercept and halt button actions
+        this.dom.btnExportPdf.disabled = true;
+        this.dom.btnText.innerText = "Downloading...";
+        this.dom.btnIcon.style.display = "none";
+
+        // Step 1 Popup Update
+        this.updateProcessPopup("Downloading [1/4]", "Capturing canvas layout matrices...", 25);
+
+        const pdfExportSettings = {
+          margin: 0,
+          filename: formattedFilename,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        };
+
+        // Step 2 Progress Update after brief delay
+        setTimeout(() => {
+          this.updateProcessPopup("Downloading [2/4]", "Compiling graphical element blocks...", 50);
+        }, 500);
+
+        // Step 3 Progress Update
+        setTimeout(() => {
+          this.updateProcessPopup("Downloading [3/4]", "Formatting file print page layers...", 75);
+        }, 1000);
+
+        // Step 4 execution sequence initialization
+        setTimeout(() => {
+          this.updateProcessPopup("Downloading [4/4]", "Executing local hardware file download stream...", 90);
+
+          // Force execution using native engine script callbacks
+          html2pdf()
+            .from(targetDOMNode)
+            .set(pdfExportSettings)
+            .save()
+            .then(() => {
+              // Successfully delivered stream alerts
+              this.updateProcessPopup("Download Complete!", `Successfully generated and saved "${formattedFilename}" to your folder folder logs.`, 100, true);
+
+              // Unlock interfaces
+              this.dom.btnExportPdf.disabled = false;
+              this.dom.btnText.innerText = "Generate Document Portfolio";
+              this.dom.btnIcon.style.display = "block";
+            })
+            .catch((runtimeError) => {
+              console.error("PDF engine encountered an execution fault:", runtimeError);
+              
+              const activePanel = document.getElementById('dynamic-process-panel');
+              if (activePanel) activePanel.remove();
+
+              this.dom.btnExportPdf.disabled = false;
+              this.dom.btnText.innerText = "Generate Document Portfolio";
+              this.dom.btnIcon.style.display = "block";
+            });
+        }, 1500);
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => ResumeEngine.init());
+  </script>
+</body>
+</html>
